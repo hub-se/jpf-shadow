@@ -1,0 +1,9 @@
+target=jpf2017.bankaccount.main.BankAccount_1c
+classpath=${jpf-shadow}/build/
+symbolic.method = jpf2017.bankaccount.main.BankAccount_1c.test(sym#sym#sym)
+symbolic.min_int=-100
+symbolic.max_int=100
+symbolic.dp=coral
+listener = gov.nasa.jpf.shadow.ShadowListener
+search.multiple_errors=true
+symbolic.optimizechoices=false

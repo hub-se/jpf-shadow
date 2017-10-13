@@ -1,0 +1,9 @@
+target=jpf2017.foo.Foo_1c
+classpath=${jpf-shadow}/build/
+symbolic.method = jpf2017.foo.Foo_1c.foo(sym)
+symbolic.min_int=-100
+symbolic.max_int=100
+symbolic.dp=coral
+listener = gov.nasa.jpf.shadow.ShadowListener
+search.multiple_errors=true
+symbolic.optimizechoices=false
