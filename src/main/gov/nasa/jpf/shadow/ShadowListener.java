@@ -148,7 +148,6 @@ public class ShadowListener extends SymbolicListener{
 	public void processChangeMethod(int index, ThreadInfo ti, Instruction insn, PCChoiceGenerator pcCg, PathCondition pc){
 		//TODO: Change to use generic expressions and only distinguish between occupied stack slots
 		StackFrame sf = ti.getModifiableTopFrame();
-		pcCg.setExecutionMode(Execute.BOTH);
 		pcCg.setCurrentPC(pc);
 		
 		switch(index){
@@ -386,8 +385,11 @@ public class ShadowListener extends SymbolicListener{
 						}
 						
 						if(first instanceof ICONST && second instanceof GOTO && third instanceof ICONST){
-							assert(((ICONST)first).getValue() == 1);
-							assert(((ICONST)third).getValue() == 0);
+							//The possible results to be pushed on the stack (0 or 1, order seems to depend on condition)
+							int firstValue = ((ICONST)first).getValue();
+							int secondValue = ((ICONST)third).getValue();
+							assert((firstValue==1 && secondValue==0) || (firstValue==0 && secondValue==1));
+							
 							
 							//The pattern pushes the result of the old expression => the if-insn is part of the evaluation of the new expr
 							if(!ifInsnFound){
