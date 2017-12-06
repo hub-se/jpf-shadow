@@ -28,9 +28,18 @@ public class MyPathCondition {
         if (!this.pathResultType.equals(other.pathResultType)) {
             return false;
         }
-        if (!this.pc.equals(other.pc)) {
+        if (this.pc != null && other.pc == null) {
             return false;
         }
+        if (this.pc == null && other.pc != null) {
+            return false;
+        }
+        if (this.pc != null && other.pc != null) {
+            if (!this.pc.equals(other.pc)) {
+                return false;
+            }
+        }
+        
         return true;
     }
 
