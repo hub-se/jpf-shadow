@@ -99,41 +99,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
         allSummaries = new HashMap<String, MethodSummary>();
     }
 
-    // Writes the method summaries to a file for use in another application
-    // private void writeTable(){
-    // try {
-    // BufferedWriter out = new BufferedWriter(new FileWriter("outFile.txt"));
-    // Iterator it = allSummaries.entrySet().iterator();
-    // String line = "";
-    // while (it.hasNext()){
-    // Map.Entry me = (Map.Entry)it.next();
-    // String methodName = (String)me.getKey();
-    // MethodSummary ms = (MethodSummary)me.getValue();
-    // line = "METHOD: " + methodName + "," +
-    // ms.getMethodName() + "(" + ms.getArgValues() + ")," +
-    // ms.getMethodName() + "(" + ms.getSymValues() + ")";
-    // out.write(line);
-    // out.newLine();
-    // Vector<Pair> pathConditions = ms.getPathConditions();
-    // if (pathConditions.size() > 0){
-    // Iterator it2 = pathConditions.iterator();
-    // while(it2.hasNext()){
-    // Pair pcPair = (Pair)it2.next();
-    // String pc = (String)pcPair.a;
-    // String errorMessage = (String)pcPair.b;
-    // line = pc;
-    // if (!errorMessage.equalsIgnoreCase(""))
-    // line = line + "$" + errorMessage;
-    // out.write(line);
-    // out.newLine();
-    // }
-    // }
-    // }
-    // out.close();
-    // } catch (Exception e) {
-    // }
-    // }
-
     @Override
     public void propertyViolated(Search search) {
         VM vm = search.getVM();
@@ -172,8 +137,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
 
             Pair<PathCondition, String> pcPair = new Pair<PathCondition, String>(pc, error);// (pc.toString(),error);
 
-            // String methodName =
-            // vm.getLastInstruction().getMethodInfo().getName();
             MethodSummary methodSummary = allSummaries.get(currentMethodName);
             methodSummary.addPathCondition(pcPair);
             allSummaries.put(currentMethodName, methodSummary);
@@ -184,7 +147,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
             // jpf-shadow:
             handleTargetLineReached(new MyPathCondition(pc, MyPathCondition.PathResultType.PROPERTY_VIOLATED));
         }
-        // }
     }
 
     @Override
@@ -193,7 +155,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
 
         if (!vm.getSystemState().isIgnored()) {
             Instruction insn = executedInstruction;
-            // SystemState ss = vm.getSystemState();
             ThreadInfo ti = currentThread;
             Config conf = vm.getConfig();
 
@@ -318,7 +279,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
 
                         if ((cg instanceof PCChoiceGenerator) && ((PCChoiceGenerator) cg).getCurrentPC() != null) {
 
-                            // if(!isDiffPC || ti.executionMode==Execute.OLD){
                             if (!isDiffPath) {
                                 return;
                             }
@@ -504,6 +464,10 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
                                     System.out.println("***********************************");
                                 }
                             }
+
+                            // jpf-shadow:
+                            handleTargetLineReached(new MyPathCondition(PathCondition.getPC(vm),
+                                    MyPathCondition.PathResultType.METHOD_END));
                         }
                     }
                 }
@@ -626,6 +590,7 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
                 // do not add duplicate test case
                 if (!allTestCases.contains(testCase))
                     allTestCases = allTestCases + "\n" + testCase;
+
             }
             pw.println(allTestCases);
         } else {
@@ -798,16 +763,6 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
 
         public Vector<Pair> getPathConditions() {
             return this.pathConditions;
-        }
-    }
-
-    @Override
-    public void methodExited(VM vm, ThreadInfo currentThread, MethodInfo exitedMethod) {
-        Config config = vm.getJPF().getConfig();
-        String collectPcForMethod = config.getString("collectPcForMethod", null);
-        if (exitedMethod.getBaseName().equals(collectPcForMethod)) {
-            handleTargetLineReached(
-                    new MyPathCondition(PathCondition.getPC(vm), MyPathCondition.PathResultType.METHOD_END));
         }
     }
 
