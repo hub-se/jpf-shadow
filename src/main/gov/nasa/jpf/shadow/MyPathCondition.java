@@ -18,16 +18,11 @@ public class MyPathCondition {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
         if (obj == null)
             return false;
         if (getClass() != obj.getClass())
             return false;
         MyPathCondition other = (MyPathCondition) obj;
-        if (!this.pathResultType.equals(other.pathResultType)) {
-            return false;
-        }
         if (this.pc != null && other.pc == null) {
             return false;
         }

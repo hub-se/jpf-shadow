@@ -103,7 +103,6 @@ public class RunnerShadow {
         conf.setProperty("vm.storage.class", "nil");
         // conf.setProperty("search.depth_limit", "30"); // default = null, i.e.
         conf.setProperty("symbolic.optimizechoices", "false");
-        conf.setProperty("search.class", ".search.heuristic.DFSHeuristic");
         return conf;
     }
 
