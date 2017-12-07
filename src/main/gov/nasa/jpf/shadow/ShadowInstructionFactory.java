@@ -35,6 +35,6 @@ public class ShadowInstructionFactory extends SymbolicInstructionFactory {
 		}
 		
 		
-		System.out.println("Using Shadow Symbolic Extension...");
+		System.out.println("Running jpf-shadow...");
 	}
 }
