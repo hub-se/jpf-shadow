@@ -9,6 +9,7 @@ import java.util.Map;
  * @author Yannic Noller <nolleryc@gmail.com> - YN
  *
  */
+@SuppressWarnings("serial")
 public class SymExParameter {
 
     public String classpath;
@@ -72,8 +73,7 @@ public class SymExParameter {
     public static final SymExParameter BankAccount_withdraw = new SymExParameter("${jpf-shadow}/build/examples",
             "${jpf-shadow}/src/examples", "jpf2017.bankaccount.withdraw", "BankAccount", "withdraw",
             "withdraw(sym#sym)", 12, "", "evaluation-results/01_BankAccount/withdraw/shadow-results/", null);
-
-    @SuppressWarnings("serial")
+   
     public static final SymExParameter BankAccount_main = new SymExParameter("${jpf-shadow}/build/examples",
             "${jpf-shadow}/src/examples", "jpf2017.bankaccount.main", "BankAccount", "main", "test(sym#sym#sym)", 23,
             "1_13,2_22,15_23,5_18,3_23,17_22,3_10_22,5_18_23", "evaluation-results/01_BankAccount/main/shadow-results/",

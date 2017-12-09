@@ -25,7 +25,7 @@ import gov.nasa.jpf.symbc.SymbolicListener;
 public class RunnerShadow {
 
     public static void main(String[] args) {
-        System.out.println(">> Started Runner for Shadow_JPF ...");
+        System.out.println(">> Started Runner for jpf-shadow ...");
 
         SymExParameter[] subjects = { SymExParameter.Foo, SymExParameter.BankAccount_deposit,
                 SymExParameter.BankAccount_withdraw, SymExParameter.BankAccount_main, };
