@@ -24,6 +24,7 @@ import gov.nasa.jpf.jvm.bytecode.ICONST;
 import gov.nasa.jpf.jvm.bytecode.INVOKEVIRTUAL;
 import gov.nasa.jpf.jvm.bytecode.IfInstruction;
 import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.shadow.ShadowInstructionFactory;
 import gov.nasa.jpf.symbc.arrays.ArrayExpression;
 import gov.nasa.jpf.symbc.heap.Helper;
 import gov.nasa.jpf.symbc.numeric.Comparator;
@@ -56,6 +57,7 @@ import gov.nasa.jpf.vm.ThreadInfo.Execute;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -766,7 +768,8 @@ public class BytecodeUtils {
     }
     
     //jpf-shadow: this instruction resets the execution mode to BOTH (necessary to handle change(boolean,boolean) stmts)
-    public static Instruction resetInstruction;
+    //public static Instruction resetInstruction;
+    public static HashSet<Instruction> resetInstructions = new HashSet<Instruction>();
 
     /* jpf-shadow:
      * Determines whether an if-insn is executed in order to compute one of the
@@ -774,94 +777,167 @@ public class BytecodeUtils {
      * whole if(change(boolean,boolean)) statement is on the same line TODO:
      * Make this look less like a hack
      */
-    public static boolean isChangeBoolean(IfInstruction insn, ThreadInfo ti) {
-        MethodInfo mi = insn.getMethodInfo();
-        int sourceline = insn.getLineNumber();
-        Instruction[] lineInsn = mi.getInstructionsForLine(sourceline);
-
-        // Indices of the last if-instructions used to evaluate the old/new
-        // expressions
-        int oldIfInsnIndex = -1;
-        int newIfInsnIndex = -1;
-
-        // Index of the actual if insn
-        int ifInsnIndex = -1;
-
-        // TODO: Do we really need to compute this for each if-instruction
-        // inside a change(boolean,boolean)? Most likely not.
-        for (Instruction i : lineInsn) {
-            if (i instanceof INVOKEVIRTUAL) {
-                INVOKEVIRTUAL inv = (INVOKEVIRTUAL) i;
-                // MethodInfo invokedMethod = inv.getInvokedMethod(ti); this
-                // seems to cause NPEs, for whatever reason
-                String methodName = inv.getInvokedMethodName();
-
-                /*
-                 * We are trying to look for instruction sequences that look
-                 * like this: ... i-1 //The last if-instruction i iconst_1 i+1
-                 * goto i+3 i+2 iconst_0 i+3 //INVOKEVIRTUAL if we have
-                 * evaluated the 2nd boolean expression, otherwise we evaluated
-                 * the first one ...
-                 * 
-                 * This sequence is usually generated in order to push the
-                 * result of the operands on the stack and therefore can be used
-                 * to distinguish between the evaluation of the old/new boolean
-                 * expression.
-                 */
-
-                if (methodName.equals("change(ZZ)Z")) {
-                    // the final if-instruction (IFEQ?) in the sourceline that
-                    // gets executed after INVOKEVIRTUAL
-                    if (insn.equals(lineInsn[lineInsn.length - 1])) {
-                        assert (insn instanceof IFEQ);
-                        return false;
-                    }
-
-                    // "Sliding window" to search for bytecode pattern
-                    for (int ind = 0; ind < lineInsn.length - 3; ind++) {
-                        Instruction first = lineInsn[ind];
-                        Instruction second = lineInsn[ind + 1];
-                        Instruction third = lineInsn[ind + 2];
-                        Instruction fourth = lineInsn[ind + 3];
-
-                        if (first.equals(insn)) {
-                            ifInsnIndex = ind;
-                        }
-
-                        if (first instanceof ICONST && second instanceof GOTO && third instanceof ICONST) {
-                        	//The possible results to be pushed on the stack (0 or 1, order seems to depend on condition)
-							int firstValue = ((ICONST)first).getValue();
-							int secondValue = ((ICONST)third).getValue();
-							assert((firstValue==1 && secondValue==0) || (firstValue==0 && secondValue==1));
-
-                            // Determine whether the pattern corresponds to the
-                            // evaluation of the old or new expression
-                            // ind-1 should point to an If-insn
-                            if (!(fourth instanceof INVOKEVIRTUAL)) {
-                                oldIfInsnIndex = ind - 1;
-                            } else {
-                                newIfInsnIndex = ind - 1;
-                            }
-                        }
-                    }
-                    if (oldIfInsnIndex == -1 && newIfInsnIndex == -1) {
-                        System.err.println(
-                                "Unable to find where the old/new expressions are being evaluated. Has BytecodeUtils.isChangeBoolean() been called somewhere else than an IfInsn?");
-                    }
-                    assert (ifInsnIndex != -1) : "Unable to find if-instruction on the same line.";
-                    if (ifInsnIndex <= oldIfInsnIndex) {
-                        resetInstruction = lineInsn[oldIfInsnIndex];
-                        ti.setExecutionMode(Execute.OLD);
-                    } else {
-                        resetInstruction = lineInsn[newIfInsnIndex];
-                        ti.setExecutionMode(Execute.NEW);
-                    }
-                    return true;
-                }
-            }
-        }
-        // if insn not part of change(boolean,boolean) statement
-        return false;
+    public static boolean isChangeBoolean(IfInstruction insn, ThreadInfo ti){
+    	Execute executionMode = getIfInsnExecutionMode(insn,ti);
+    	if(executionMode != Execute.BOTH){
+    		return true;
+    	}
+    	return false;
     }
-
+    
+	public static Execute getIfInsnExecutionMode(IfInstruction insn, ThreadInfo ti){
+		/* 
+		 * If-insns prior to a change(boolean,boolean) invocation register choice generators with
+		 * the execution mode BOTH. If-insns inside the first and second parameter register choice generators
+		 * with the execution mode OLD and NEW, respectively.
+		 * 
+		 * The bytecode is generated in such a way that there are only two instructions
+		 * (iconst_1 and iconst_0) for each boolean expression argument (no matter how complex)					 
+		 * that push the result of the evaluated boolean expression on the stack (is this compiler dependent?).
+		 * 
+		 *  Usually, the bytecode sequence looks like this:
+		 *  i+0 IF... //The last if instruction evaluating the old boolean expression//
+		 *  i+1 iconst_1
+		 *  i+2 goto i+4
+		 *  i+3 iconst_0  	
+		 *  Which means that after this sequence the second boolean expression is being evaluated:
+		 *  ...
+		 *  j+0 IF... //The last if instruction evaluating the new boolean expression//
+		 *  j+1 iconst_1
+		 *  j+2 goto j+4
+		 *  j+3 iconst_0
+		 *  j+4 INVOKEVIRTUAL //Invocation of the change(boolean,boolean) method
+		 *  
+		 *  Note that this is only the case if there is actually any if-insn involved in the evaluation
+		 *  of the first boolean expression (i.e. the old boolean expression is not a constant like true or false). 
+		 *  Otherwise, the result will be directly pushed on the stack.
+		 */	
+		
+		PCChoiceGenerator curPcCg;
+		ChoiceGenerator<?> curCg = ti.getVM().getSystemState().getChoiceGenerator();
+		if(curCg instanceof PCChoiceGenerator){
+			curPcCg = (PCChoiceGenerator)curCg;
+		}
+		else{
+			curPcCg = curCg.getPreviousChoiceGeneratorOfType(PCChoiceGenerator.class);
+		}
+		
+		Execute cgExecutionMode = curPcCg.getExecutionMode();
+		Execute currentExecutionMode = ti.getExecutionMode();
+		
+		//This should only be executed for the first if-insn the OLD/NEW expression of a change(boolean,boolean) stmt
+		//The second condition will evaluate to true after we have executed all if-insns of the old expression and
+		//the listener reset the ti execution mode to BOTH; from that point on we evaluate the new expression
+		if(cgExecutionMode == Execute.BOTH || 
+				(cgExecutionMode == Execute.OLD && currentExecutionMode == Execute.BOTH)){ 
+			String sourceline = insn.getSourceLine().replaceAll("\\s++", ""); //simple normalization
+			int ifInsnIndex = -1; //insn-index of the querying if-insn
+			int oldResultIndex = -1; //insn-index of the bytecode pattern that pushes the OLD result on the stack
+			int newResultIndex = -1; //insn-index of the bytecoe pattern that pushes the NEW result on the stack
+			
+			//Handle final IFEQ insn after the invokevirtual change(ZZ)Z insn
+			if(insn instanceof IFEQ || insn instanceof IFNE){
+				if(insn.getPrev() instanceof JVMInvokeInstruction 
+						&& ((JVMInvokeInstruction)insn.getPrev()).getInvokedMethodName().endsWith("change(ZZ)Z")){
+					ti.setExecutionMode(Execute.BOTH);
+					return Execute.BOTH;
+				}
+			}
+			
+			if(sourceline.contains("change(")){
+				Instruction currentInsn = insn;
+				//Determine the number of lines of the change(boolean,boolean) stmt
+				boolean foundChangeInvocation = false;
+				while(!foundChangeInvocation){
+					assert(currentInsn != null): "Error searching for INVOKEVIRTUAL insn for change(boolean,boolean) "
+													 	+ "stmt on line "+insn.getLineNumber();
+					if(currentInsn instanceof JVMInvokeInstruction){
+						String invokedMethod = ((JVMInvokeInstruction) currentInsn).getInvokedMethodName();
+						if(invokedMethod.endsWith("change(ZZ)Z")){ //found change(boolean,boolean)
+							foundChangeInvocation = true;
+						}
+					}
+					currentInsn = currentInsn.getNext();
+				}
+			}
+			else if(cgExecutionMode == Execute.BOTH){
+				assert(ti.getExecutionMode()==Execute.BOTH);
+				return Execute.BOTH;
+			}
+				
+			//Now search for bytecode pattern iconst_1/0 goto iconst_1/0 that push results of the old/new expression
+			Instruction first, second, third, fourth;
+			second = insn;
+			third = second.getNext();
+			fourth = third.getNext();
+			
+			//If insns that push the result of the evaluation of the boolean expression on the stack
+			//These instructions will reset the execution mode to BOTH
+			Instruction resetInsn1 = null, resetInsn2 = null;
+			
+			boolean foundPattern = false;					
+			for(int ind = 0; !foundPattern; ind++){
+				first = second;
+				second = third;
+				third = fourth;
+				fourth = fourth.getNext();
+				
+				if(first.equals(insn)){
+					ifInsnIndex=ind;
+				}
+				if(first instanceof ICONST && second instanceof GOTO && third instanceof ICONST){
+					foundPattern = true;
+				
+					//Determine whether the pattern corresponds to the evaluation of the old or new expression
+					if(fourth instanceof JVMInvokeInstruction){ //new expression
+						newResultIndex = ind;
+					}
+					else{
+						oldResultIndex = ind;
+					}
+					resetInsn1 = first;
+					resetInsn2 = third;
+				}	
+			}
+			
+			assert(ifInsnIndex != -1):"Unable to find if-insn " +insn.getMnemonic()+" inside change(boolean, boolean) stmt on line "+insn.getLineNumber();
+			assert(!(oldResultIndex==-1 && newResultIndex==-1)):"Unable to determine where the old/new parameters of the "
+													+ "change(boolean,boolean) stmt are evaluated on line "+insn.getLineNumber();
+			
+			if(ifInsnIndex == -1){
+				System.out.println("Unable to find if insn "+insn.getMnemonic()+" searching on line "+insn.getLineNumber());
+			}
+			
+			if(ifInsnIndex <= oldResultIndex){
+				ti.setExecutionMode(Execute.OLD);
+				resetInstructions.add(resetInsn1);
+				resetInstructions.add(resetInsn2);
+				if(ShadowInstructionFactory.debugChangeBoolean) System.out.println("change(b,b) in line "+insn.getLineNumber()+": instruction "+insn.getMnemonic()+" belongs to OLD expression");
+				return Execute.OLD;
+			}
+			else{
+				ti.setExecutionMode(Execute.NEW);
+				resetInstructions.add(resetInsn1);
+				resetInstructions.add(resetInsn2);
+				if(ShadowInstructionFactory.debugChangeBoolean) System.out.println("change(b,b) in line "+insn.getLineNumber()+": instruction "+insn.getMnemonic()+" belongs to NEW expression");
+				return Execute.NEW;
+			}		
+			
+		}	
+		else{
+			//Last registered CG was either OLD or NEW, note that after executing a change(boolean,boolean) the last registered cg is BOTH
+			switch(currentExecutionMode){
+			case OLD: //We're still evaluating the old boolean expression
+				ti.setExecutionMode(Execute.OLD);
+				return Execute.OLD;
+			case NEW: //We're still evaluating the new boolean expression
+				ti.setExecutionMode(Execute.NEW);
+				return Execute.NEW;
+			default: //BOTH
+				assert(false):(insn.getLineNumber()+" "+insn.getMnemonic()+ " cg: "+cgExecutionMode+" ti: "+currentExecutionMode
+				+" diff: "+curPcCg.getCurrentPC().isDiffPC() + " pc: "+curPcCg.getCurrentPC().toString());
+				return Execute.BOTH;
+			}
+		}	
+	}
 }

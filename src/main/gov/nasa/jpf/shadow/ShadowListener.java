@@ -25,12 +25,6 @@ public class ShadowListener extends SymbolicListener{
 	//Method specifications for the change()-methods
 	MethodSpec[] changeMethods = new MethodSpec[5]; 
 	
-	/* Reset execution mode to BOTH at the next instruction.
-	 * This flag is set twice during the evaluation of a change(boolean,boolean) statement, specifically
-	 * after the evaluation of the first (execution mode: old) and the second (execution mode: new) boolean expression. 
-	 */
-	boolean resetAtNextInsn = false; 
-	
 	public ShadowListener(Config conf, JPF jpf) {
 		super(conf,jpf);
 		changeMethods[0] = MethodSpec.createMethodSpec("*.change(boolean,boolean)");
@@ -75,30 +69,19 @@ public class ShadowListener extends SymbolicListener{
 		Instruction insn = instructionToExecute;
 		ThreadInfo ti = currentThread;
 		
-		//The previous insn set the reset flag, reset execution mode now
-		if(this.resetAtNextInsn){
-			ti.setExecutionMode(Execute.BOTH);
-			this.resetAtNextInsn = false;
-			BytecodeUtils.resetInstruction = null; //TODO: is this necessary?
-			if(ShadowInstructionFactory.debugChangeBoolean) System.out.println("Resetted execution mode to BOTH before executing "+insn.getMnemonic());
-		}
-		
-		/* Determine whether the next insn resets the execution mode to BOTH,
-		 * which is necessary to handle if(change(boolean,boolean)) statements.
-		 * 
-		 * The reset insn should be an if-insn (particularly, the last one 
-		 * evaluating either the old or the new boolean expression). 
-		 * Since if-insns are usually executed twice (after setting a choice generator),
-		 * we actually want to reset the execution mode after the 2nd execution.
-		 * 
-		 * The second condition translates to "If the insn is an If-insn, firstStepInsn has to be true"
-		 */
-		if(BytecodeUtils.resetInstruction != null){
-			if(insn.equals(BytecodeUtils.resetInstruction)
-					&& (!(insn instanceof IfInstruction) || ti.isFirstStepInsn())){
-				if(ShadowInstructionFactory.debugChangeBoolean) System.out.println("Reset to BOTH after executing "+insn.getMnemonic());
-				this.resetAtNextInsn = true;
+		//We might have to reset the execution mode to BOTH while executing a change(boolean,boolean) statement
+		//See BytecodeUtils.getIfInsnExecutionMode()
+		if(!BytecodeUtils.resetInstructions.isEmpty()){
+			boolean reset = false;
+			Execute currentExecutionMode = ti.getExecutionMode();
+			for(Instruction i : BytecodeUtils.resetInstructions){
+				if(insn.equals(i)){
+					reset = true;
+					ti.setExecutionMode(Execute.BOTH);
+					if(ShadowInstructionFactory.debugChangeBoolean) System.out.println("Reset execution mode from " + currentExecutionMode + " to BOTH before executing "+insn.getMnemonic());
+				}
 			}
+			if(reset) BytecodeUtils.resetInstructions.clear();
 		}
 		
 		
@@ -336,11 +319,11 @@ public class ShadowListener extends SymbolicListener{
 		
 		//Iterate through all instructions on the same line and check for insn that invokes a change(boolean,boolean) method
 		for(Instruction i : lineInsn){
-			if(i instanceof INVOKEVIRTUAL){
-				INVOKEVIRTUAL inv = (INVOKEVIRTUAL) i;
+			if(i instanceof JVMInvokeInstruction){
+				JVMInvokeInstruction inv = (JVMInvokeInstruction) i;
 				String invMethodName = inv.getInvokedMethodName();
 				
-				if(invMethodName.equals("change(ZZ)Z")){
+				if(invMethodName.endsWith("change(ZZ)Z")){
 				/*
 				 * Now skip the evaluation of the first if-insn
 				 *  
@@ -397,7 +380,7 @@ public class ShadowListener extends SymbolicListener{
 							}
 							
 							//The sequence corresponds to the evaluation of the 2nd expression, abort mission
-							if(fourth instanceof INVOKEVIRTUAL){
+							if(fourth instanceof JVMInvokeInstruction){
 								return;
 							}
 							

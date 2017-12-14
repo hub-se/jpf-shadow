@@ -163,7 +163,7 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
                 // jpf-shadow: handle change(boolean,boolean), TODO Why is this
                 // necessary? Would this generate duplicate test cases?
                 if (!ti.isFirstStepInsn()
-                        && ((JVMInvokeInstruction) insn).getInvokedMethodName().equals("change(ZZ)Z")) {
+                        && ((JVMInvokeInstruction) insn).getInvokedMethodName().endsWith("change(ZZ)Z")) {
                     return;
                 }
 
