@@ -104,7 +104,7 @@ public class ShadowListener extends SymbolicListener{
 			//If we are about to execute an if-insn while exploring a diff path, we have to handle the special case if(change(boolean,boolean))
 			//(specifically, skip the evaluation of the first (old) boolean expression since it affects the path condition)
 			if(insn instanceof IfInstruction && pc.isDiffPC()){
-				checkChangeDuringDiff(vm, ti, insn);				
+				checkChangeDuringDiff(vm, ti, (IfInstruction)insn);				
 			}
 		}
 		
@@ -302,112 +302,60 @@ public class ShadowListener extends SymbolicListener{
 	}
 	
 	
-	public void checkChangeDuringDiff(VM vm, ThreadInfo ti, Instruction insn){
+	public void checkChangeDuringDiff(VM vm, ThreadInfo ti, IfInstruction insn){
 		/*
 		* We are currently exploring a diff path and are about to execute an if-instruction.
 		* If the if-insn is executed in an if(change(boolean,boolean)) statement, 
 		* we have to skip the evaluation of the first (the old) boolean expression,
 		* since it would modify the path condition.
-		* 
-		* We assume that the condition is on the same line in the source code.
-		* Implementation is similar to BytecodeUtils.isChangeBoolean()
 		*/
-		
-		MethodInfo mi = insn.getMethodInfo();
-		int sourceline = insn.getLineNumber();
-		Instruction[] lineInsn = mi.getInstructionsForLine(sourceline);
-		
-		//Iterate through all instructions on the same line and check for insn that invokes a change(boolean,boolean) method
-		for(Instruction i : lineInsn){
-			if(i instanceof JVMInvokeInstruction){
-				JVMInvokeInstruction inv = (JVMInvokeInstruction) i;
-				String invMethodName = inv.getInvokedMethodName();
-				
-				if(invMethodName.endsWith("change(ZZ)Z")){
-				/*
-				 * Now skip the evaluation of the first if-insn
-				 *  
-				 * The bytecode is generated in such a way that there are only two instructions
-				 * (iconst_1 and iconst_0) for each boolean expression argument (no matter how complex)
-				 * which push the result of the evaluated boolean expression on the stack (is this compiler dependent?).
-				 * 
-				 *  Usually, the bytecode sequence looks like this:
-				 *  i+0 IF... //The last if instruction evaluating the old boolean expression//
-				 *  i+1 iconst_1
-				 *  i+2 goto 4
-				 *  i+3 iconst_0
-				 *  
-				 *  Which means that after this sequence the second boolean expression is being evaluated:
-				 *  ...
-				 *  j+0 IF... //The last if instruction evaluating the new boolean expression//
-				 *  j+1 iconst_1
-				 *  j+2 goto 4
-				 *  j+3 iconst_0
-				 *  j+4 INVOKEVIRTUAL //Invocation of the change(boolean,boolean) method
-				 *  
-				 *  So all we have to do is to skip all instructions until encounter the first sequence.
-				 *  
-				 *  Note that this is only the case if there is actually any if-insn involved in the evaluation
-				 *  of the first boolean expression (i.e. the old boolean expression is not a constant like true or false). 
-				 *  Otherwise we don't need to modify anything at all, because the value of the boolean expression
-				 *  pushed on the stack will be ignored afterwards.
-				 */	
-				 //TODO: add some debugging outputs
-	
-					//Search for the bytecode sequence
-					boolean ifInsnFound = false;
+		//We only have to handle the case where the if-insn is executed in the OLD version of change(boolean,boolean)
+		if(BytecodeUtils.getIfInsnExecutionMode(insn, ti) == Execute.OLD){
+			ti.setExecutionMode(Execute.BOTH); //TODO: or NEW?
+			//First search for bytecode pattern that pushes the old result on stack	
+			MethodInfo mi = insn.getMethodInfo();
+			Instruction first = insn;
+			Instruction second = first.getNext();
+			Instruction third = second.getNext();
+			boolean foundPattern = false;
+			while(!foundPattern){
+
+				if(first instanceof ICONST && second instanceof GOTO && third instanceof ICONST){
+					assert(!(third.getNext() instanceof JVMInvokeInstruction));
+					foundPattern = true;
 					
-					for(int ind = 0; ind < lineInsn.length-3; ind++){
-						Instruction first = lineInsn[ind];
-						Instruction second = lineInsn[ind+1];
-						Instruction third = lineInsn[ind+2];
-						Instruction fourth = lineInsn[ind+3];
-						
-						if(first.equals(insn)){
-							ifInsnFound = true;
+					//Skip the evaluation of the old boolean expression by removing the operands from the stack
+					//and setting the next insn to the first insn that evaluates the new expression
+					
+					//These insns have two operands
+					if(insn instanceof IF_ICMPEQ ||
+						insn instanceof IF_ICMPGE ||
+						insn instanceof IF_ICMPGT ||
+						insn instanceof IF_ICMPLE ||
+						insn instanceof IF_ICMPLT ||
+						insn instanceof IF_ICMPNE){
+							ti.getModifiableTopFrame().pop();	
 						}
-						
-						if(first instanceof ICONST && second instanceof GOTO && third instanceof ICONST){
-							//The possible results to be pushed on the stack (0 or 1, order seems to depend on condition)
-							int firstValue = ((ICONST)first).getValue();
-							int secondValue = ((ICONST)third).getValue();
-							assert((firstValue==1 && secondValue==0) || (firstValue==0 && secondValue==1));
-							
-							
-							//The pattern pushes the result of the old expression => the if-insn is part of the evaluation of the new expr
-							if(!ifInsnFound){
-								return;
-							}
-							
-							//The sequence corresponds to the evaluation of the 2nd expression, abort mission
-							if(fourth instanceof JVMInvokeInstruction){
-								return;
-							}
-							
-							
-							//We have found the sequence where the first expression is being evaluated, skip evaluation
-							//Pop the operands and push dummy value
-							
-							//For the following instructions, we actually have to pop two operands
-							if(insn instanceof IF_ICMPEQ ||
-									insn instanceof IF_ICMPGE ||
-									insn instanceof IF_ICMPGT ||
-									insn instanceof IF_ICMPLE ||
-									insn instanceof IF_ICMPLT ||
-									insn instanceof IF_ICMPNE){
-								ti.getModifiableTopFrame().pop();	
-							}
 									
-							ti.getModifiableTopFrame().pop();
-							ti.getModifiableTopFrame().push(0);
+					ti.getModifiableTopFrame().pop();
+					ti.getModifiableTopFrame().push(0);
 							
-							//Skip bytecode instruction to the evaluation of the second
-							ti.setNextPC(third.getNext()); //third.getNext() == fourth ?
-							return;
-						}
-					}
+					//Skip bytecode instruction to the evaluation of the new boolean expression
+					ti.setNextPC(third.getNext());
+					return;
+				}
+				else{
+					first = second;
+					second = third;
+					third = third.getNext();
+					assert(mi.containsLineNumber(third.getLineNumber()));
 				}
 			}
 		}
-	}
+	}				
+							
+		
+	
+	
+	
 }
