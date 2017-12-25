@@ -21,7 +21,6 @@ package gov.nasa.jpf.symbc.bytecode;
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.jvm.bytecode.GOTO;
 import gov.nasa.jpf.jvm.bytecode.ICONST;
-import gov.nasa.jpf.jvm.bytecode.INVOKEVIRTUAL;
 import gov.nasa.jpf.jvm.bytecode.IfInstruction;
 import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
 import gov.nasa.jpf.shadow.ShadowInstructionFactory;
@@ -825,12 +824,20 @@ public class BytecodeUtils {
 		Execute cgExecutionMode = curPcCg.getExecutionMode();
 		Execute currentExecutionMode = ti.getExecutionMode();
 		
+		
 		//This should only be executed for the first if-insn the OLD/NEW expression of a change(boolean,boolean) stmt
 		//The second condition will evaluate to true after we have executed all if-insns of the old expression and
 		//the listener reset the ti execution mode to BOTH; from that point on we evaluate the new expression
 		if(cgExecutionMode == Execute.BOTH || 
 				(cgExecutionMode == Execute.OLD && currentExecutionMode == Execute.BOTH)){ 
-			String sourceline = insn.getSourceLine().replaceAll("\\s++", ""); //simple normalization
+			String sourceline;
+			try{
+				sourceline = insn.getSourceLine().replaceAll("\\s++", ""); //simple normalization
+			}catch(NullPointerException e){
+				//No available source (e.g. library function), hence no change() annotation possible
+				ti.setExecutionMode(Execute.BOTH);
+				return Execute.BOTH;
+			}
 			int ifInsnIndex = -1; //insn-index of the querying if-insn
 			int oldResultIndex = -1; //insn-index of the bytecode pattern that pushes the OLD result on the stack
 			int newResultIndex = -1; //insn-index of the bytecoe pattern that pushes the NEW result on the stack
