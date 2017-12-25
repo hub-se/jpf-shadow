@@ -1,0 +1,11 @@
+target=org.apache.commons.math.OpenMapRealMatrix
+classpath=${jpf-shadow}/build/tests
+sourcepath=${jpf-shadow}/src/tests
+symbolic.method = org.apache.commons.math.OpenMapRealMatrix.test(sym#sym)
+symbolic.min_int=-100
+symbolic.max_int=100
+symbolic.dp=coral
+listener =.shadow.ShadowListener
+search.multiple_errors=true
+symbolic.optimizechoices=false
+
