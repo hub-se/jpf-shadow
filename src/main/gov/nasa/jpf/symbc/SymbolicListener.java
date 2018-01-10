@@ -276,11 +276,25 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
                         if (((PCChoiceGenerator) cg).getCurrentPC() != null) {
                             isDiffPath = ((PCChoiceGenerator) cg).getCurrentPC().isDiffPC();
                         }
+                        
+                        // jpf-shadow: check for possible output divergences even if we have no
+                        // divergence in control flow (has to explicitly enabled in the config)
+                        boolean outputDivergences = false;
+                        boolean foundOutputDivergence = false;
 
                         if ((cg instanceof PCChoiceGenerator) && ((PCChoiceGenerator) cg).getCurrentPC() != null) {
 
                             if (!isDiffPath) {
-                                return;
+                            	String outputDiff = conf.getProperty("shadow.output_divergences");
+								if (outputDiff != null && outputDiff.equals("true")) {
+									outputDivergences = true;
+									//TODO
+									if(!(insn instanceof IRETURN)){
+										throw new RuntimeException("output divergences only supported for integer return");
+									}
+								} else {
+									return;
+								}
                             }
 
                             PathCondition pc = ((PCChoiceGenerator) cg).getCurrentPC();
@@ -310,22 +324,50 @@ public class SymbolicListener extends PropertyListenerAdapter implements Publish
                             String returnString = "";
 
                             Expression result = null;
+                            Expression resultOld = null;
+                            
                             if (insn instanceof IRETURN) {
                                 IRETURN ireturn = (IRETURN) insn;
                                 int returnValue = ireturn.getReturnValue();
                                 IntegerExpression returnAttr = null;
+                                IntegerExpression returnAttrOld = null;
                                 Object returnObj = ireturn.getReturnAttr(ti);
                                 if (returnObj != null) {
                                     if (returnObj instanceof DiffExpression) {
                                         returnAttr = (IntegerExpression) ((DiffExpression) returnObj).getSymbc();
+                                        if(outputDivergences){
+											returnAttrOld = (IntegerExpression) ((DiffExpression) returnObj).getShadow();
+											PathCondition outputDivergentPc = pc.make_copy();
+											//We have an output divergence if both expressions yield unequal results
+											outputDivergentPc._addDet(Comparator.NE, returnAttr, returnAttrOld);
+											if(!outputDivergentPc.simplify()){ //no output divergence possible
+												return;
+											}
+											else{
+												foundOutputDivergence = true;
+												outputDivergentPc.solve();
+												outputDivergentPc.markAsDiffPC(ireturn.getLineNumber(), Diff.diffReturn);
+												((PCChoiceGenerator) cg).setCurrentPC(outputDivergentPc);
+												pc = outputDivergentPc;
+											}
+                                        }
                                     } else {
                                         returnAttr = (IntegerExpression) returnObj;
                                     }
+                                }
+                                else if(outputDivergences && !isDiffPath){
+                                	return;
                                 }
 
                                 if (returnAttr != null) {
                                     returnString = "Return Value: " + String.valueOf(returnAttr.solution());
                                     result = returnAttr;
+                                    
+                                    if(foundOutputDivergence){
+										returnString = "Return Value: (New: " + String.valueOf(returnAttr.solution())
+																	+", Old: " + String.valueOf(returnAttrOld.solution()+")");
+										resultOld = returnAttrOld;
+									}
                                 } else { // concrete
                                     returnString = "Return Value: " + String.valueOf(returnValue);
                                     result = new IntegerConstant(returnValue);
