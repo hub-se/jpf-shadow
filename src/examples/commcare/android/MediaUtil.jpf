@@ -1,0 +1,12 @@
+target=commcare.android.MediaUtil
+classpath=${jpf-shadow}/build/tests
+sourcepath=${jpf-shadow}/src/tests
+symbolic.method= commcare.android.mediautil.getBitmapScaledToContainer(sym#sym#sym#sym)
+symbolic.min_int=1
+symbolic.max_int=500
+symbolic.dp=coral
+search.multiple_errors=true
+#listener = .symbc.SymbolicListener
+listener =.shadow.ShadowListener
+symbolic.optimizechoices=false
+shadow.output_divergences=true

@@ -240,61 +240,71 @@ public class ShadowListener extends SymbolicListener{
 			}
 		case 1:
 			//Matched with change(int,int)
-						
+			
 			//Get the current symbolic expressions of the two params, index 0 refers to 'this'
 			Object op_v1 = sf.getLocalAttr(1);
 			Object op_v2 = sf.getLocalAttr(2);
-			DiffExpression result_i;
-			IntegerExpression sym_expr_i = null;
-			IntegerExpression shadow_expr_i = null;
-
-			//Check if the first operand is symbolic or concrete
-			if(op_v1 != null){ 				
-				/*
-				 * If the symbolic expression of the first operand is shadowed by another symbolic expression,
-				 * both expressions are encapsulated in a DiffExpression object
-				 * since the first operand represents the old value, its shadowing symbolic expression will
-				 * become the shadow symbolic expression of the result
-				 */
-				if(op_v1 instanceof DiffExpression){							
-					shadow_expr_i = (IntegerExpression)((DiffExpression)op_v1).getShadow();
-				}
-				else{
-					//The symbolic expression is stored directly in the attribute slot, no shadowing symbolic expression
-					shadow_expr_i = (IntegerExpression) op_v1;
-				}				
-			}
-			else{ //First operand is concrete, create new shadow symbolic expression
-				int concreteValue = sf.getLocalVariable(1);
-				shadow_expr_i = new IntegerConstant(concreteValue);
-			}
 			
-			/*
-			 * The symbolic expression of the second operand will become the symbolic expression
-			 * of the result, even if it is being shadowed by another symbolic expression
-			 */
-			if(op_v2 != null){
-				if(op_v2 instanceof DiffExpression){
-					sym_expr_i = (IntegerExpression)((DiffExpression)op_v2).getSymbc();
-				}
-				else{
-					sym_expr_i = (IntegerExpression) op_v2;
-				}
-			}
-			else{ //Concrete value, create new symbolic expression
-				int concreteValue = sf.getLocalVariable(2);
-				sym_expr_i = new IntegerConstant(concreteValue);
-			}
-			result_i = new DiffExpression(shadow_expr_i, sym_expr_i);
-			sf.setOperandAttr(result_i);
+			int v1 = sf.getLocalVariable(1);
+			int v2 = sf.getLocalVariable(2);
+			
+			
+			DiffExpression result;
+			IntegerExpression shadow_expr_i = BytecodeUtils.getShadowExpr(op_v1, v1);
+			IntegerExpression sym_expr_i = BytecodeUtils.getSymbcExpr(op_v2, v2);
+			
+			result = new DiffExpression(shadow_expr_i,sym_expr_i);
+			sf.setOperandAttr(result);
 			return;
 		
-		//Float/Double/Long not supported yet
-		case 2:	
-		case 3:	
+		case 2:
+			//Matched with change(float,float) probably not needed as float operands will be casted to double if they are not used like 3.14f
+
+			Object op_v3 = sf.getLocalAttr(1);
+			Object op_v4 = sf.getLocalAttr(2);
+			
+			float v3 = sf.getFloatLocalVariable(1);
+			float v4 = sf.getFloatLocalVariable(2);
+			
+			DiffExpression result_f;
+			RealExpression shadow_expr_f = BytecodeUtils.getShadowExpr(op_v3, v3);
+			RealExpression sym_expr_f = BytecodeUtils.getSymbcExpr(op_v4, v4);
+			
+			result_f = new DiffExpression(shadow_expr_f,sym_expr_f);
+			sf.setOperandAttr(result_f);
+			return;
+			
+		case 3:
+			//Matched with change(double,double)
+			Object op_v5 = sf.getLongLocalAttr(1);
+			Object op_v6 = sf.getLongLocalAttr(3); //double and long operands occupy two consecutive attribute slots
+			
+			double v5 = sf.getDoubleLocalVariable(1);
+			double v6 = sf.getDoubleLocalVariable(3);
+			
+			DiffExpression result_d;
+			RealExpression shadow_expr_d = BytecodeUtils.getShadowExpr(op_v5, v5);
+			RealExpression sym_expr_d = BytecodeUtils.getSymbcExpr(op_v6, v6);
+
+			result_d = new DiffExpression(shadow_expr_d,sym_expr_d);
+			sf.setLongOperandAttr(result_d);
+			return;
+			
 		case 4:
-			throw new RuntimeException("change()-annotation not supported for Float, Double and Long types yet.");			
-		default:
+			//Matched with change(long,long)
+			Object op_v7 = sf.getLongLocalAttr(1);
+			Object op_v8 = sf.getLongLocalAttr(3);
+			
+			long v7 = sf.getLongLocalVariable(1);
+			long v8 = sf.getLongLocalVariable(3);
+
+			DiffExpression result_l;
+			IntegerExpression shadow_expr_l = BytecodeUtils.getShadowExpr(op_v7, v7);
+			IntegerExpression sym_expr_l = BytecodeUtils.getSymbcExpr(op_v8, v8);
+			
+			result_l = new DiffExpression(shadow_expr_l,sym_expr_l);
+			sf.setLongOperandAttr(result_l);
+			return;default:
 			//Should not happen
 			assert(false);
 			return;

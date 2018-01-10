@@ -35,6 +35,7 @@ import gov.nasa.jpf.symbc.numeric.MinMax;
 import gov.nasa.jpf.symbc.numeric.PCChoiceGenerator;
 import gov.nasa.jpf.symbc.numeric.PathCondition;
 import gov.nasa.jpf.symbc.numeric.PreCondition;
+import gov.nasa.jpf.symbc.numeric.RealConstant;
 import gov.nasa.jpf.symbc.numeric.RealExpression;
 import gov.nasa.jpf.symbc.numeric.SymbolicInteger;
 import gov.nasa.jpf.symbc.numeric.SymbolicReal;
@@ -705,7 +706,7 @@ public class BytecodeUtils {
         return name /* + "_" + (symVarCounter++) + suffix */;
     }
     
-    //jpf-shadow: helper method to determine symbolic/shadow expressions of variables
+    //jpf-shadow: helper methods to determine symbolic/shadow expressions of variables
     public static IntegerExpression getSymbcExpr(Object expr, int concreteValue) {
         if (expr != null) {
             if (expr instanceof DiffExpression) {
@@ -727,6 +728,78 @@ public class BytecodeUtils {
             }
         } else {
             return new IntegerConstant(concreteValue);
+        }
+    }
+    
+    public static IntegerExpression getSymbcExpr(Object expr, long concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (IntegerExpression) ((DiffExpression) expr).getSymbc();
+            } else {
+                return (IntegerExpression) expr;
+            }
+        } else {
+            return new IntegerConstant(concreteValue);
+        }
+    }
+
+    public static IntegerExpression getShadowExpr(Object expr, long concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (IntegerExpression) ((DiffExpression) expr).getShadow();
+            } else {
+                return (IntegerExpression) expr;
+            }
+        } else {
+            return new IntegerConstant(concreteValue);
+        }
+    }
+    
+    public static RealExpression getSymbcExpr(Object expr, double concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (RealExpression) ((DiffExpression) expr).getSymbc();
+            } else {
+                return (RealExpression) expr;
+            }
+        } else {
+            return new RealConstant(concreteValue);
+        }
+    }
+
+    public static RealExpression getShadowExpr(Object expr, double concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (RealExpression) ((DiffExpression) expr).getShadow();
+            } else {
+                return (RealExpression) expr;
+            }
+        } else {
+            return new RealConstant(concreteValue);
+        }
+    }
+    
+    public static RealExpression getSymbcExpr(Object expr, float concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (RealExpression) ((DiffExpression) expr).getSymbc();
+            } else {
+                return (RealExpression) expr;
+            }
+        } else {
+            return new RealConstant(concreteValue);
+        }
+    }
+    
+    public static RealExpression getShadowExpr(Object expr, float concreteValue) {
+        if (expr != null) {
+            if (expr instanceof DiffExpression) {
+                return (RealExpression) ((DiffExpression) expr).getShadow();
+            } else {
+                return (RealExpression) expr;
+            }
+        } else {
+            return new RealConstant(concreteValue);
         }
     }
 
@@ -761,9 +834,51 @@ public class BytecodeUtils {
             } else if (value instanceof Boolean) {
                 int v = ((Boolean) value).booleanValue() == true ? 1 : 0;
                 pc._addDet(Comparator.EQ, (IntegerExpression) sym_v, v);
+            } else if (value instanceof Double){
+            	double v = ((Double) value).doubleValue();
+                pc._addDet(Comparator.EQ, (RealExpression) sym_v, v);
             }
         }
         return;
+    }
+    
+    //jpf-shadow: returns hashmap mapping symbolic expressions to their concrete values
+    public enum ValueType{INT , LONG, DOUBLE, FLOAT};
+    public static HashMap<Expression, Object> getConcreteValueMapping(PathCondition pc, ValueType type) {
+		HashMap<Expression, Object> concreteValueMap = new HashMap<Expression, Object>();
+    	switch(type){
+    	case DOUBLE:
+    		for(String var : valueMap.keySet()){
+    			if(var.equals("this")){
+    				continue;
+    			}
+    			Object value = valueMap.get(var);
+    			Expression sym_v = expressionMap.get(var);
+    			
+    			double doubleValue = 0;
+    			if(value instanceof Integer){
+    				doubleValue = ((Integer) value).doubleValue();
+    				concreteValueMap.put(sym_v, new Double(doubleValue));
+    			}
+    			else if(value instanceof Long){
+    				doubleValue = ((Long) value).doubleValue();
+    				concreteValueMap.put(sym_v, new Double(doubleValue));
+    			}
+    			else if(value instanceof Float){
+    				doubleValue = ((Float) value).doubleValue();
+    				concreteValueMap.put(sym_v, new Double(doubleValue)); 
+    			}
+    			else if(value instanceof Double){
+    				concreteValueMap.put(sym_v, value); 
+    			}
+    			else{
+    	    		throw new RuntimeException("invalid type");
+    			}
+    		}
+    		return concreteValueMap;
+    	default:
+    		throw new RuntimeException("not implemented");
+    	}
     }
     
     //jpf-shadow: this instruction resets the execution mode to BOTH (necessary to handle change(boolean,boolean) stmts)
@@ -776,7 +891,7 @@ public class BytecodeUtils {
      * whole if(change(boolean,boolean)) statement is on the same line TODO:
      * Make this look less like a hack
      */
-    public static boolean isChangeBoolean(IfInstruction insn, ThreadInfo ti){
+    public static boolean isChangeBoolean(Instruction insn, ThreadInfo ti){
     	Execute executionMode = getIfInsnExecutionMode(insn,ti);
     	if(executionMode != Execute.BOTH){
     		return true;
@@ -784,7 +899,7 @@ public class BytecodeUtils {
     	return false;
     }
     
-	public static Execute getIfInsnExecutionMode(IfInstruction insn, ThreadInfo ti){
+	public static Execute getIfInsnExecutionMode(Instruction insn, ThreadInfo ti){
 		/* 
 		 * If-insns prior to a change(boolean,boolean) invocation register choice generators with
 		 * the execution mode BOTH. If-insns inside the first and second parameter register choice generators
