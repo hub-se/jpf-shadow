@@ -39,7 +39,13 @@ public class ShadowListener extends SymbolicListener{
 	public void choiceGeneratorAdvanced (VM vm, ChoiceGenerator<?> currentCG) {
 		if(ShadowInstructionFactory.debugCG){
 			if(currentCG instanceof PCChoiceGenerator){
-				System.out.println("PC CG at line "+((PCChoiceGenerator)currentCG).getInsn().getLineNumber()+" advanced, choice: "+currentCG.getNextChoice());
+				System.out.println("PCCG("+currentCG.getInsn().getMnemonic()+")"
+						+ " ADVANCED. Line: "+currentCG.getInsn().getLineNumber()
+						+ " Processed: "+currentCG.getProcessedNumberOfChoices()
+						+ "/" + currentCG.getTotalNumberOfChoices());
+			}
+			else{
+				System.out.println("OTHER CG ADVANCED.");
 			}
 		}
 	}
@@ -164,7 +170,13 @@ public class ShadowListener extends SymbolicListener{
 				 * Choice 1: Diff true path
 				 * Choice 2: Diff false path
 				 */
-				PCChoiceGenerator nextCg = new PCChoiceGenerator(0,2,1);
+				PCChoiceGenerator nextCg;
+				if(pcCg.getNextChoice() == 2){
+					nextCg = new PCChoiceGenerator(0,0,1);
+				}
+				else{
+					nextCg = new PCChoiceGenerator(1,2,1);
+				}
 				nextCg.setOffset(insn.getPosition());
 				nextCg.setMethodName(insn.getMethodInfo().getFullName());
 				nextCg.setExecutionMode(Execute.BOTH);
