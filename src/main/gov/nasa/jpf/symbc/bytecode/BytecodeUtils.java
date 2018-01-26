@@ -259,7 +259,7 @@ public class BytecodeUtils {
             // create a choice generator to associate the precondition with it
             ChoiceGenerator<?> cg = null;
             if (!th.isFirstStepInsn()) { // first time around
-                cg = new PCChoiceGenerator(1);
+                cg = new PCChoiceGenerator(2,2,1);
                 th.getVM().setNextChoiceGenerator(cg);
                 return new InstructionOrSuper(false, invInst);
             } else { // this is what really returns results
