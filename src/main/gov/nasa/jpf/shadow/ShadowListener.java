@@ -154,15 +154,6 @@ public class ShadowListener extends SymbolicListener{
 			
 			IntegerExpression old_expr = BytecodeUtils.getShadowExpr(old_attr, old_value);
 			IntegerExpression new_expr = BytecodeUtils.getSymbcExpr(new_attr, new_value);
-						
-			// If we execute a change(boolean,boolean) while exploring a diff path, we only want to consider the value of the new expression
-			/*
-			if(pc.isDiffPC()){
-				// TODO: it is probably sufficient to set the concrete return value only
-				sf.setOperandAttr(new_expr);
-				return;
-			}
-			*/
 			
 			
 			if(!ti.isFirstStepInsn()){
@@ -172,20 +163,21 @@ public class ShadowListener extends SymbolicListener{
 				 * Choice 2: Diff false path
 				 */
 				PCChoiceGenerator nextCg;
+				
 				if(pc.isDiffPC()){
 					nextCg = new PCChoiceGenerator(5,5,1);
 				}
-				else if(old_attr != null && new_attr != null){
+				else if(old_attr == null && new_attr == null){
 					// None of the two parameters is a single symbolic boolean
-					nextCg = new PCChoiceGenerator(0,0,1);
+					nextCg = new PCChoiceGenerator(2,2,1);
 				}
 				else{
 					if(pcCg.getNextChoice() == 2){
 						// TODO: shouldn't this be (2,2,1) ?
-						nextCg = new PCChoiceGenerator(0,2,1);
+						nextCg = new PCChoiceGenerator(2,2,1);
 					}
 					else{
-						nextCg = new PCChoiceGenerator(1,2,1);
+						nextCg = new PCChoiceGenerator(0,1,1);
 					}
 				}
 				
@@ -222,11 +214,7 @@ public class ShadowListener extends SymbolicListener{
 				DiffExpression result_expr = new DiffExpression(old_expr,new_expr);
 				
 				switch(choice){
-				case 0: //Concrete execution
-					curCg.setCurrentPC(nextPc);
-					sf.setOperandAttr(result_expr);
-					return;
-				case 1: //Diff true
+				case 0: //Diff true
 					nextPc._addDet(Comparator.EQ, new_expr, 1); //--> True
 					nextPc._addDet(Comparator.EQ, old_expr, 0); //--> False
 					if(!nextPc.simplify()){
@@ -235,12 +223,16 @@ public class ShadowListener extends SymbolicListener{
 					curCg.setCurrentPC(nextPc);
 					sf.setOperandAttr(result_expr);
 					return;
-				case 2: //Diff false
+				case 1: //Diff false
 					nextPc._addDet(Comparator.EQ, new_expr, 0); //--> False
 					nextPc._addDet(Comparator.EQ, old_expr, 1); //--> True
 					if(!nextPc.simplify()){
 						ti.getVM().getSystemState().setIgnored(true);
 					}
+					curCg.setCurrentPC(nextPc);
+					sf.setOperandAttr(result_expr);
+					return;
+				case 2: //Concrete execution
 					curCg.setCurrentPC(nextPc);
 					sf.setOperandAttr(result_expr);
 					return;
