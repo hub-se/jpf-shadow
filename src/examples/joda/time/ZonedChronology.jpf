@@ -1,0 +1,11 @@
+target=joda.time.ZonedChronology
+classpath=${jpf-shadow}/build/tests
+sourcepath=${jpf-shadow}/src/tests
+symbolic.method= joda.time.ZonedChronology.localToUTC(sym#sym)
+#symbolic.min_int=-100
+#symbolic.max_int=100
+symbolic.dp=z3
+search.multiple_errors=true
+#listener = .symbc.SymbolicListener
+listener =.shadow.ShadowListener
+symbolic.optimizechoices=false
