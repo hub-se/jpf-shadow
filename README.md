@@ -19,7 +19,7 @@ The following instructions will show you how to install and run `jpf-shadow`.
 
 ### 1. Prerequisites
 
-jpf-shadow is built as an extension of Symbolic Pathfinder (SPF) (which is again build on top of Java Pathfinder(JPF)). Therefore, make sure to have [jpf-core](https://github.com/javapathfinder/jpf-core) and [jpf-symbc](https://github.com/SymbolicPathFinder/jpf-symbc) installed and properly setup on your machine.  
+`jpf-shadow` is built as an extension of Symbolic Pathfinder (SPF) (which is again build on top of Java Pathfinder(JPF)). Therefore, make sure to have [jpf-core](https://github.com/javapathfinder/jpf-core) and [jpf-symbc](https://github.com/SymbolicPathFinder/jpf-symbc) installed and properly setup on your machine.  
 
 Assuming that you have installed `jpf-core`, `jpf-symbc` and `jpf-shadow` under `<user.home>/workspace/jpf`, your `site.properties` file (usually located in `<user.home>/.jpf`) should look like this:
 
@@ -36,7 +36,7 @@ extensions=${jpf-core},${jpf-symbc},${jpf-shadow}
 
 ### 2a. Setup using the command line
 
-To build jpf-shadow using the command line, move to the project directory (i.e. `<user.home>/workspace/jpf/jpf-shadow` and run: 
+To build jpf-shadow using the command line, move to the project directory (i.e. `<user.home>/workspace/jpf/jpf-shadow`) and run: 
 
 ```
 ant build
@@ -51,7 +51,7 @@ If there are any building errors, please check if your `site.properties` file is
 
 
 ### 3. Running jpf-shadow 
-To run a `change()`-annotated Java program, jpf-shadow requires an appropriate `.jpf` configuration file. The folder `src/examples` contains various examples of annotated programs with their `.jpf` files.
+To run a `change()`-annotated Java program, `jpf-shadow` requires an appropriate `.jpf` configuration file. The folder `src/examples` contains various examples of annotated programs together with their `.jpf` files.
 
 The settings that can be specified are:
 
@@ -72,7 +72,7 @@ The settings that can be specified are:
 The `Foo` example from the paper (located inside `src/examples/jpf2017`) can now be executed in the following way:
 
 ##### 1. Choosing the initial test input
-To specify the initial test input of the `foo()` method, simply change the concrete parameter passed to it inside the main method.
+To specify the initial test input of the `foo(int)` method, simply change the concrete parameter passed to it inside the main method.
 
 ##### 2a. Run using the command line
 Use the command:
@@ -83,7 +83,7 @@ java -jar <user.home>/workspace/jpf/jpf-core/build/RunJPF.jar <user.home>/worksp
 Select the `Foo.jpf` configuration file and run it using the **run-jpf-shadow** run configuration. 
 
 ##### 3. Output
-Assuming that `foo` has been run with the initial input `x=1`, the output should contain the following lines:
+Assuming that `foo(int)` has been run with the initial input `x=1`, the output should contain the following lines:
 
 ```
 ...
