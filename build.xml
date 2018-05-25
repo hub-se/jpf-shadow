@@ -26,7 +26,7 @@
   <property file="${jpf.site}"/>
 
   <!-- otherwise we use the parent dir and the global ~/.jpf as fallback -->
-  <property file="../site.properties"/>  
+  <property file="../site.properties"/>
   <property file="${user.home}/.jpf/site.properties"/>
 
   <fail unless="jpf-core">no jpf-core location set, check site.properties</fail>
@@ -37,7 +37,7 @@
   <property file="${jpf-symbc}/jpf.properties"/>
 
   <!-- compiler settings -->
-  <property name="src_level"     value="6"/>
+  <property name="src_level"     value="8"/>
   <property name="debug"         value="on"/>
   <property name="deprecation"   value="on"/>
 
@@ -164,7 +164,7 @@
         <path refid="lib.path"/>
         <pathelement location="build/annotations"/>
       </classpath>
-    </javac>             
+    </javac>
   </target>
 
 
@@ -252,7 +252,7 @@
     <condition property="junit.usefile">
       <!-- don't set if this is running from within an IDE that collects output -->
       <not>
-        <isset property="netbeans.home"/>  
+        <isset property="netbeans.home"/>
       </not>
     </condition>
 
