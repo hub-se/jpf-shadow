@@ -364,10 +364,13 @@ public class PathCondition implements Comparable<PathCondition> {
         if (isReplay) {
             return true;
         }
-        if (SymbolicInstructionFactory.greenSolver == null)
+        if (SymbolicInstructionFactory.greenSolver == null) {
+        		simplifyOld(); // TODO YN: temporary fix to avoid uncleaned solver
             return simplifyOld();
-        else
+        }
+        else {
             return simplifyGreen();
+        }
     }
 
     private boolean solveWithSolution() {

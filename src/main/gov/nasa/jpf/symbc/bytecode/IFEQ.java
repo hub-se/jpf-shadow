@@ -85,9 +85,9 @@ public class IFEQ extends gov.nasa.jpf.jvm.bytecode.IFEQ {
 					}
 					else{
 						//The standard case: Until we detect a divergence, we follow the concrete execution and check for divergences along the path (choices: 2,3,4).
-						PCChoiceGenerator prevCg = curPcCg.getPreviousChoiceGeneratorOfType(PCChoiceGenerator.class);
-						if(prevCg.getExecutionMode() != Execute.BOTH ){
-							if(prevCg.getNextChoice() == 2){
+						//PCChoiceGenerator prevCg = curPcCg.getPreviousChoiceGeneratorOfType(PCChoiceGenerator.class);
+						if(curPcCg.getExecutionMode() != Execute.BOTH){
+							if(curPcCg.getNextChoice() == 2){
 								nextCg = new PCChoiceGenerator(2,2,1);
 							}
 							else{
