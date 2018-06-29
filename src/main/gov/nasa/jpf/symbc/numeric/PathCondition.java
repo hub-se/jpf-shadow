@@ -365,7 +365,6 @@ public class PathCondition implements Comparable<PathCondition> {
             return true;
         }
         if (SymbolicInstructionFactory.greenSolver == null) {
-        		simplifyOld(); // TODO YN: temporary fix to avoid uncleaned solver
             return simplifyOld();
         }
         else {
