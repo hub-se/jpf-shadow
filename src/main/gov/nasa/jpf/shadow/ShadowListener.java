@@ -32,6 +32,8 @@ public class ShadowListener extends SymbolicListener{
 		changeMethods[2] = MethodSpec.createMethodSpec("*.change(float,float)");
 		changeMethods[3] = MethodSpec.createMethodSpec("*.change(double, double)");
 		changeMethods[4] = MethodSpec.createMethodSpec("*.change(long,long)");
+		SymbolicConstraintsGeneral.suppressOutput = false;
+		ShadowInstructionFactory.debugCG = false;
 	}
 	
 	//Choice generator debugging
@@ -361,11 +363,23 @@ public class ShadowListener extends SymbolicListener{
 					first = second;
 					second = third;
 					third = third.getNext();
-					assert(mi.containsLineNumber(third.getLineNumber()));
+					assert(containsLineNumber(mi,third.getLineNumber()));
 				}
 			}
 		}
-	}				
+	}
+	
+	// Fixed MethodInfo.containsLineNumber(int) method (the one used in jpf-core has a bug)
+	private boolean containsLineNumber(MethodInfo mi, int lineNumber) {
+		int[] methodLineNumbers = mi.getLineNumbers();
+		if(lineNumber >= methodLineNumbers[0] && 
+				lineNumber <= methodLineNumbers[methodLineNumbers.length-1]) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
 							
 		
 	
